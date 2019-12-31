@@ -29,6 +29,7 @@ func main() {
 	server.ListenUDP("0.0.0.0:515")
 
 	db := createConn()
+	defer db.Close()
 	server.Boot()
 
 	go func(channel syslog.LogPartsChannel) {
