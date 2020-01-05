@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -38,31 +39,23 @@ func main() {
 	server.ListenTCP("0.0.0.0:515")
 	server.ListenUDP("0.0.0.0:515")
 
+	// fmt.Printf(db)
+
 	db := createConn()
 	// fmt.Print(db)
 	defer db.Close()
 	server.Boot()
 
+	r, _ := regexp.Compile("(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])")
+
 	go func(channel syslog.LogPartsChannel) {
 		for logParts := range channel {
-			fmt.Print(logParts["content"])
-			origin := strings.Split(fmt.Sprintf("%v", logParts["content"]), " ")
-			if isIP(origin[6]) {
-				_, err := db.Exec("INSERT INTO logs(message, timestamp, severity, origin) VALUES ($1, $2, $3, $4)", logParts["content"], logParts["timestamp"], logParts["severity"])
-				if err != nil {
-					fmt.Print(err.Error())
-					log.Fatal(err)
-				}
-			} else {
-				for i := range origin {
-					if isIP(origin[i]) {
-						_, err := db.Exec("INSERT INTO logs(message, timestamp, severity, origin) VALUES ($1, $2, $3, $4)", logParts["content"], logParts["timestamp"], logParts["severity"])
-						if err != nil {
-							log.Fatal(err)
-						}
-						break
-					}
-				}
+			str := logParts["content"]
+			origin := r.FindString(fmt.Sprintf("%s", str))
+
+			_, err := db.Exec("INSERT INTO logs(message, timestamp, severity, origin) VALUES ($1, $2, $3, $4)", logParts["content"], logParts["timestamp"], logParts["severity"], origin)
+			if err != nil {
+				log.Fatal(err)
 			}
 
 		}
