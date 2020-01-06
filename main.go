@@ -2,9 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"encoding/xml"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -57,6 +59,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			go checkPorts(origin)
 
 		}
 	}(channel)
@@ -93,4 +96,51 @@ func isIP(ip string) bool {
 	}
 
 	return false
+}
+
+type nmapAttacker struct {
+	XMLName   xml.Name   `xml:"host"`
+	host      string     `xml:"host"`
+	status    string     `xml:"status"`
+	address   string     `xml:"address"`
+	hostnames []Hostname `xml:"hostnames"`
+	ports     []Port     `xml:"ports"`
+}
+
+type Hostname struct {
+	XMLName  xml.Name `xml:"name"`
+	name     string   `xml:"name"`
+	hostType string   `xml:"type"`
+}
+
+type Port struct {
+	XMLName  xml.Name `xml:"port"`
+	protocol string   `xml:"protocol"`
+	port     int      `xml:"portid"`
+}
+
+func checkPorts(attackerIP string) {
+	fmt.Print("Starting nmap for " + attackerIP)
+	cmd := exec.Command("proxychains", "nmap", "-oX -", attackerIP)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+	}
+	var nmap = nmapAttacker{}
+	if err := xml.NewDecoder(stdout).Decode(&nmap); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Print(nmap)
+
+}
+
+type attackerDetails struct {
+	open            []int
+	closed          []int
+	hostname        string
+	hostingLocation string
+	greynoiseInfo   string
 }
